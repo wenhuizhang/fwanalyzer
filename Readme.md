@@ -1,5 +1,8 @@
 # FwAnalyzer (Firmware Analyzer)
 
+[![CircleCI](https://circleci.com/gh/cruise-automation/fwanalyzer.svg?style=shield)](https://circleci.com/gh/cruise-automation/fwanalyzer)
+
+
 FwAnalyzer is a tool to analyze (ext2/3/4), FAT/VFat, SquashFS, UBIFS filesystem images,
 and directory content using a set of configurable rules.
 FwAnalyzer relies on [e2tools](https://github.com/crmulliner/e2tools/) for ext filesystems,
@@ -51,6 +54,10 @@ Example report:
 }
 ```
 
+## Building and Development
+
+Follow the steps described in [Building](Building.md) to install all requirements and build FwAnalyzer.
+
 ## Using FwAnalyzer
 
 Command line options
@@ -58,7 +65,7 @@ Command line options
 - `-cfgpath`     : string, path to config file and included files (can be repated)
 - `-in`          : string, filesystem image file or path to directory
 - `-out`         : string, output report to file or stdout using '-'
-- `-tree`        : string, overwrite directory to read the filetree file from
+- `-extra`       : string, overwrite directory to read extra data from (e.g. filetree, filecmp)
 - `-ee`          : exit with error if offenders are present
 - `-invertMatch` : invert regex matches (for testing)
 
@@ -257,11 +264,11 @@ Example Output:
 #### Example: Run an external script passing the filename to the script
 
 The file is extracted into a temp directory with a temp name before the script is executed.
-The check fails if the script produced output on standard out.
+The check produces an offender if the script produced output on stdout or stderr.
 
 - `File` : string, the full path of the file or directory
 - `Script` : string, the full path of the script
-- `ScriptOptions` : string array, (optional) the first element allows to define a pattern containing wildcards like `?`, `*`, and `**` that is applied to filenames if present it will only check files that match the pattern, this is mostly useful when running the script on a directory. The second element allows passing an argument to the script.
+- `ScriptOptions` : string array, (optional) the first element allows to define a pattern containing wildcards like `?`, `*`, and `**` that is applied to filenames if present it will only check files that match the pattern, this is mostly useful when running the script on a directory. The second element allows passing arguments to the script.
 - `File` : string, the full path of the file, if the path points to a directory the script is run for every file in the directory and subdirectories
 
 - `Desc` : string, (optional) is a descriptive string that will be attached to failed check
@@ -321,6 +328,39 @@ Example Output:
 }
 ```
 
+### File Compare Check
+
+The `FileCmp` (File Compare) check is a mechanism to compare a file from a previous 
+run with the file from the current run. The main idea behind this check is to provide
+more insights into file changes, since it allows comparing two versions of a file rather than
+comparing only a digest.
+
+This works by saving the file as the `OldFilePath` 
+(if it does not exist) and skipping the check at the first run. In consecutive runs
+the current file and the saved old file will be copied to a temp directory. The script will
+be executed passing the original filename, the path to the old file and the path to the current file
+as arguments. If the script prints output the check will be marked as failed.
+
+- `File` : string, the full path of the file
+- `Script`: string, path to the script
+- `ScriptOptions`: string, argument passed to the script
+- `OldFilePath`: string, filename (absolute or relative) to use to store old file
+- `InformationalOnly` : bool, (optional) the result of the check will be Informational only (default: false)
+
+Script runs as:
+```sh
+script.sh <OrigFilename> <oldFile> <newFile> -- <argument>
+```
+
+Example:
+```toml
+[FileCmp."test.txt"]
+File = "/test.txt"
+Script = "diff.sh"
+OldFilePath = "test.txt"
+InformationalOnly = true
+```
+
 ### File Tree Check
 
 The `FileTree` check generates a full filesystem tree (a list of every file and directory) and compares it with a previously saved file tree. The check will produce an informational output listing new files, deleted files, and modified files.
@@ -331,7 +371,7 @@ The `FileTree` check generates a full filesystem tree (a list of every file and 
 the newly generated filetree file is OldFileTreePath with ".new" appeneded to it.
 
 The `OldFileTreePath` is relative to the configuration file. This means for '-cfg testdir/test.toml' with OldTreeFilePath = "test.json" fwanalyzer will
-try to read 'testdir/test.json'. The `-tree` command line option can be used to overwrite the path: '-cfg testdir/test.toml -tree test1' will try to
+try to read 'testdir/test.json'. The `-extra` command line option can be used to overwrite the path: '-cfg testdir/test.toml -extra test1' will try to
 read 'test1/test.json'. Similar the newly generated filetree file will be stored in the same directory.
 
 File modification check can be customized with:
