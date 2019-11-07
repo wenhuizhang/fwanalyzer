@@ -58,6 +58,9 @@ Example report:
 
 Follow the steps described in [Building](Building.md) to install all requirements and build FwAnalyzer.
 
+
+
+
 ## Using FwAnalyzer
 
 Command line options
